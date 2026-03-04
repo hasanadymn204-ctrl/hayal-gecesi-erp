@@ -18,7 +18,7 @@ def giris_kontrol():
             st.title("🌙 Hayal Gecesi Giriş")
             user = st.text_input("Kullanıcı Adı")
             pw = st.text_input("Şifre", type="password")
-            if st.button("Giriş Yap"):
+            if st.button("Giriş Yap", use_container_width=True):
                 if user == ADMIN_USER and pw == ADMIN_PASS:
                     st.session_state.authed = True
                     st.rerun()
@@ -58,7 +58,8 @@ if giris_kontrol():
                 st.image(Image.open(yol), use_container_width=True)
                 break
         sayfa = st.radio("MENÜ", ["🏠 Ana Panel", "🛒 Sipariş Oluştur", "📦 Ürün & Stok", "👥 Müşteri Yönetimi"])
-        if st.button("🚪 Çıkış"):
+        st.markdown("---")
+        if st.button("🚪 Güvenli Çıkış", use_container_width=True):
             st.session_state.authed = False
             st.rerun()
 
@@ -78,35 +79,88 @@ if giris_kontrol():
 
     # --- SAYFA 2: SİPARİŞ OLUŞTUR ---
     elif sayfa == "🛒 Sipariş Oluştur":
-        st.title("🛒 Satış Ekranı")
+        st.title("🛒 Satış ve Fiş Ekranı")
         
+        # SADECE FİŞİ YAZDIRAN ÖZEL CSS (Butonları gizler)
+        st.markdown("""
+            <style>
+            @media print {
+                [data-testid="stSidebar"], .stButton, .stSuccess, .stInfo, .stAlert, header, footer, [data-testid="stHeader"] {
+                    display: none !important;
+                }
+                .main .block-container { padding: 0 !important; margin: 0 !important; }
+                .print-receipt { display: block !important; width: 100% !important; border: none !important; }
+            }
+            .print-receipt {
+                font-family: 'Courier New', Courier, monospace;
+                max-width: 380px;
+                margin: 10px auto;
+                padding: 15px;
+                border: 1px dashed #333;
+                background-color: white;
+                color: black;
+            }
+            </style>
+        """, unsafe_allow_html=True)
+
         if st.session_state.son_siparis:
             sip = st.session_state.son_siparis
-            st.success("✅ Satış Tamamlandı!")
-            # Fiş Görünümü (Yazıcı Dostu)
-            st.markdown(f"""
-                <div style="font-family:monospace; padding:20px; border:1px dashed #333; width:300px; background:white; color:black;">
-                    <h3 align="center">HAYAL GECESİ</h3>
-                    <p>Müşteri: {sip['m']}<br>Tarih: {datetime.now().strftime('%d/%m/%Y %H:%M')}</p>
-                    <hr>
-                    {''.join([f"<p>{i['Ürün']} ({i['Beden']}) x{i['Adet']} <span style='float:right;'>{i['Toplam']:.2f}</span></p>" for i in sip['s']])}
-                    <hr>
-                    <h4 align="right">TOPLAM: {sip['t']:.2f} TL</h4>
+            st.success("✅ Satış Başarıyla Kaydedildi!")
+            
+            # TEMİZ FİŞ TASARIMI
+            fiş_html = f"""
+                <div class="print-receipt">
+                    <div style="text-align: center;">
+                        <h2 style="margin:0;">🌙 HAYAL GECESİ</h2>
+                        <p style="font-size: 12px; margin:5px;">Sipariş Bilgi Fişi</p>
+                        <hr style="border-top: 1px dashed black;">
+                    </div>
+                    <p><b>Tarih:</b> {datetime.now().strftime('%d/%m/%Y %H:%M')}</p>
+                    <p><b>Müşteri:</b> {sip['m']}</p>
+                    <table width="100%" style="font-size: 14px; border-collapse: collapse;">
+                        <thead>
+                            <tr style="border-bottom: 1px solid black;">
+                                <th align="left">Ürün</th>
+                                <th align="center">Ad.</th>
+                                <th align="right">Tutar</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {''.join([f"<tr><td style='padding:5px 0;'>{i['Ürün']} ({i['Beden']})</td><td align='center'>{i['Adet']}</td><td align='right'>{i['Toplam']:.2f}</td></tr>" for i in sip['s']])}
+                        </tbody>
+                    </table>
+                    <hr style="border-top: 1px dashed black;">
+                    <h3 align="right" style="margin-top:10px;">TOPLAM: {sip['t']:.2f} TL</h3>
+                    <div style="text-align: center; font-size: 11px; margin-top: 25px;">
+                        <p>Bizi Tercih Ettiğiniz İçin Teşekkür Ederiz!</p>
+                        <p>www.hayalgecesi.com</p>
+                    </div>
                 </div>
-            """, unsafe_allow_html=True)
-            if st.button("🆕 Yeni Satış"):
-                st.session_state.son_siparis = None
-                st.rerun()
+            """
+            st.markdown(fiş_html, unsafe_allow_html=True)
+            
+            c1, c2 = st.columns(2)
+            with c1:
+                if st.button("🖨️ Fişi Yazdır", use_container_width=True):
+                    # window.parent.print() komutu bembeyaz sayfa sorununu çözer
+                    st.components.v1.html(
+                        "<script>window.parent.print();</script>", 
+                        height=0, width=0
+                    )
+            with c2:
+                if st.button("🆕 Yeni Satış", use_container_width=True):
+                    st.session_state.son_siparis = None
+                    st.rerun()
         else:
             m_list = ["Genel Müşteri"] + musteri_df["Müşteri Adı"].tolist()
-            secilen_m = st.selectbox("Müşteri", m_list)
+            secilen_m = st.selectbox("Müşteri Seçin", m_list)
             
             if not stok_df.empty:
                 stok_df["Display"] = stok_df["Stok Kodu"].astype(str) + " - " + stok_df["Ürün"] + " (" + stok_df["Beden"] + ")"
                 c1, c2, c3 = st.columns([3,1,1])
-                u_sec = c1.selectbox("Ürün", ["Seçiniz..."] + stok_df[stok_df["Adet"] > 0]["Display"].tolist())
+                u_sec = c1.selectbox("Ürün Seç", ["Seçiniz..."] + stok_df[stok_df["Adet"] > 0]["Display"].tolist())
                 adt = c2.number_input("Adet", 1, 100, 1)
-                if c3.button("➕ Ekle"):
+                if c3.button("➕ Sepete Ekle"):
                     if u_sec != "Seçiniz...":
                         idx = stok_df[stok_df["Display"] == u_sec].index[0]
                         u = stok_df.loc[idx]
@@ -115,13 +169,16 @@ if giris_kontrol():
             
             if st.session_state.sepet:
                 st.table(pd.DataFrame(st.session_state.sepet)[["Ürün", "Beden", "Adet", "Fiyat", "Toplam"]])
-                if st.button("✅ Satışı Tamamla", use_container_width=True):
+                if st.button("✅ Satışı Tamamla ve Fiş Oluştur", use_container_width=True):
                     top_t = sum(i["Toplam"] for i in st.session_state.sepet)
                     top_k = sum((i["Fiyat"] - i["Alış"]) * i["Adet"] for i in st.session_state.sepet)
+                    
                     for i in st.session_state.sepet: stok_df.at[i["idx"], "Adet"] -= i["Adet"]
                     stok_df.drop(columns=["Display"], errors='ignore').to_csv(STOK_FILE, index=False)
+                    
                     y_s = pd.DataFrame([{"Tarih": datetime.now().strftime("%d/%m/%Y %H:%M"), "Müşteri": secilen_m, "Ürünler": "Sepet Detayı", "Toplam Tutar": top_t, "Toplam Kâr": top_k}])
                     pd.concat([gecmis_df, y_s], ignore_index=True).to_csv(SATIS_FILE, index=False)
+                    
                     st.session_state.son_siparis = {"m": secilen_m, "s": list(st.session_state.sepet), "t": top_t}
                     st.session_state.sepet = []
                     st.rerun()
@@ -140,7 +197,9 @@ if giris_kontrol():
                     st.success("Ürün eklendi!"); st.rerun()
         with t1:
             ed = st.data_editor(stok_df, use_container_width=True, num_rows="dynamic")
-            if st.button("💾 Stok Listesini Güncelle"): ed.to_csv(STOK_FILE, index=False); st.success("Kaydedildi!"); st.rerun()
+            if st.button("💾 Stok Listesini Güncelle"): 
+                ed.to_csv(STOK_FILE, index=False)
+                st.success("Kaydedildi!"); st.rerun()
 
     # --- SAYFA 4: MÜŞTERİ YÖNETİMİ ---
     elif sayfa == "👥 Müşteri Yönetimi":
